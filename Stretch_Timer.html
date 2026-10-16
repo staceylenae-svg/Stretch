@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0a1429"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="My Stretch Timer">
+<title>My Stretch Timer</title>
+<style>
+:root{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:#eef4ff;background:#0a1429;font-variant-numeric:tabular-nums}*{box-sizing:border-box}body{margin:0;min-height:100svh;background:radial-gradient(circle at top,#1b3356,#0a1429 65%);display:flex;justify-content:center}main{width:min(100%,520px);padding:max(24px,env(safe-area-inset-top)) 22px max(24px,env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:20px}header{text-align:center}h1{font-size:clamp(26px,7vw,34px);margin:8px 0 4px}header p,.muted{color:#a8bad2;margin:0}.card{padding:22px 18px;border-radius:26px;background:#152540;border:1px solid #2d4264;text-align:center}.pill{display:inline-block;background:#294871;color:#d6eaff;border-radius:30px;padding:8px 16px;font-size:15px;font-weight:700;letter-spacing:.04em}.clock{font-size:clamp(74px,20vw,110px);font-weight:800;letter-spacing:-.06em;line-height:1.2;margin:22px 0 6px}.stage{font-size:20px;font-weight:700;margin-bottom:20px}.progress{height:12px;background:#314361;border-radius:12px;overflow:hidden;margin:20px 0}.progress>div{height:100%;background:#77b6ff;width:0%;transition:width .12s linear}.stats{display:grid;grid-template-columns:1fr 1fr;gap:14px}.stat{background:#101e34;border-radius:16px;padding:13px 6px}.stat b{display:block;font-size:25px}.stat span{color:#b9c9da;font-size:13px}.buttons{display:grid;grid-template-columns:1fr 1fr;gap:12px}button{border:none;border-radius:17px;min-height:66px;font:700 22px -apple-system,BlinkMacSystemFont,sans-serif;touch-action:manipulation}#start{background:#5baaff;color:#08172c}#reset{background:#344660;color:#fff}button:disabled{opacity:.45}.note{font-size:14px;line-height:1.5;color:#b6c8df;text-align:center}.check{display:flex;gap:10px;align-items:center;justify-content:center;font-size:15px;color:#c6d6eb}.check input{width:20px;height:20px;accent-color:#65b4ff}.complete{color:#98f7c1}.hidden{display:none}
+</style>
+</head>
+<body><main>
+<header><h1>💙 My Stretch Timer</h1><p>19 stretches · 15 minutes 50 seconds</p></header>
+<section class="card" aria-live="off">
+<div class="pill" id="round">STRETCH 1 OF 19</div>
+<div class="clock" id="clock" role="timer" aria-label="Time remaining">00:45</div>
+<div class="stage" id="stage">Hold your stretch</div>
+<div class="progress" role="progressbar" aria-label="Routine progress" aria-valuemin="0" aria-valuemax="950" aria-valuenow="0" id="progress"><div id="bar"></div></div>
+<div class="stats"><div class="stat"><b id="remaining">15:50</b><span>Time remaining</span></div><div class="stat"><b id="count">0 / 19</b><span>Stretches completed</span></div></div>
+</section>
+<div class="buttons"><button id="start">▶ Start</button><button id="reset">↺ Reset</button></div>
+<label class="check"><input type="checkbox" id="sounds" checked> Play sounds and spoken cues</label>
+<p class="note" id="note">Tap Start to begin. A cue plays after each 45-second hold, then another after the 5-second change. Keep this screen open and your iPhone volume turned up.</p>
+</main>
+<script>
+(()=>{'use strict';
+const ROUNDS=19,HOLD=45,CHANGE=5,TOTAL=ROUNDS*(HOLD+CHANGE);
+const $=id=>document.getElementById(id);
+let elapsed=0,startedAt=0,running=false,finished=false,tickId=null,audio=null,wakeLock=null,lastStage=-1;
+const fmt=s=>{s=Math.max(0,Math.ceil(s));return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
+function beep(freq=700,duration=.18,count=1){if(!$('sounds').checked)return;try{audio=audio||new(window.AudioContext||window.webkitAudioContext)();if(audio.state==='suspended')audio.resume();for(let i=0;i<count;i++){const osc=audio.createOscillator(),gain=audio.createGain(),t=audio.currentTime+i*.26;osc.type='sine';osc.frequency.value=freq;gain.gain.setValueAtTime(.0001,t);gain.gain.exponentialRampToValueAtTime(.25,t+.015);gain.gain.exponentialRampToValueAtTime(.0001,t+duration);osc.connect(gain);gain.connect(audio.destination);osc.start(t);osc.stop(t+duration+.02)}}catch(e){}}
+function say(message){if(!$('sounds').checked||!('speechSynthesis'in window))return;try{speechSynthesis.cancel();let u=new SpeechSynthesisUtterance(message);u.rate=1.05;u.volume=1;speechSynthesis.speak(u)}catch(e){}}
+function cue(stage){if(stage===0)return;if(stage>=ROUNDS*2){beep(840,.2,3);setTimeout(()=>say('Great work! All 19 stretches complete.'),700);return}if(stage%2===1){beep(650,.18,2);setTimeout(()=>say('Change position'),520)}else{beep(880,.2,1);setTimeout(()=>say('Stretch '+(Math.floor(stage/2)+1)),300)}}
+async function keepAwake(){if('wakeLock'in navigator){try{wakeLock=await navigator.wakeLock.request('screen')}catch(e){}}}
+function releaseWake(){if(wakeLock){wakeLock.release().catch(()=>{});wakeLock=null}}
+function render(){const e=Math.min(TOTAL,elapsed),phase=Math.min(ROUNDS*2,Math.floor(e/50)*2+(e%50>=HOLD?1:0));$('progress').setAttribute('aria-valuenow',Math.floor(e));$('bar').style.width=(100*e/TOTAL)+'%';$('remaining').textContent=fmt(TOTAL-e);$('count').textContent=Math.min(ROUNDS,Math.floor(e/50))+' / '+ROUNDS;
+if(e>=TOTAL){$('clock').textContent='00:00';$('round').textContent='ALL DONE!';$('stage').textContent='🎉 Wonderful work!';$('stage').classList.add('complete');$('count').textContent='19 / 19';$('start').textContent='▶ Start Again';$('start').disabled=false;return}
+let round=Math.floor(e/50)+1,part=e%50,isChange=part>=HOLD;
+$('round').textContent='STRETCH '+round+' OF '+ROUNDS;
+$('clock').textContent=fmt((isChange?50:HOLD)-part);
+$('stage').textContent=isChange?'Get into your next position':'Hold your stretch';$('stage').classList.remove('complete');$('start').textContent=running?'Ⅱ Pause':'▶ '+(elapsed>0?'Resume':'Start');$('start').disabled=false;
+}
+function stop(){running=false;clearInterval(tickId);tickId=null;releaseWake()}
+function tick(){if(!running)return;const e=Math.min(TOTAL,(performance.now()-startedAt)/1000);const stage=Math.min(ROUNDS*2,Math.floor(e/50)*2+(e%50>=45?1:0));if(stage>lastStage){for(let s=lastStage+1;s<=stage;s++)cue(s);lastStage=stage}elapsed=e;if(e>=TOTAL){stop();finished=true}render()}
+$('start').addEventListener('click',()=>{if(running){elapsed=Math.min(TOTAL,(performance.now()-startedAt)/1000);stop();render();return}if(finished){elapsed=0;finished=false;lastStage=-1}if(audio&&audio.state==='suspended')audio.resume().catch(()=>{});else if($('sounds').checked){try{audio=audio||new(window.AudioContext||window.webkitAudioContext)();audio.resume().catch(()=>{})}catch(e){}}startedAt=performance.now()-elapsed*1000;running=true;lastStage=Math.floor(elapsed/50)*2+(elapsed%50>=45?1:0);keepAwake();tick();tickId=setInterval(tick,100)});
+$('reset').addEventListener('click',()=>{stop();elapsed=0;finished=false;lastStage=-1;if('speechSynthesis'in window)speechSynthesis.cancel();render()});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&running){keepAwake();tick()}});render();
+})();
+</script></body></html>
